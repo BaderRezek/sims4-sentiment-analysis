@@ -18,7 +18,8 @@ USER_AGENT = os.getenv("REDDIT_USER_AGENT")
 
 # --- SQLite paths and connection ---
 from pathlib import Path
-DB_DIR = Path("../data/db")
+REPO_ROOT = Path(__file__).resolve().parents[1]  # /.../sims4-sentiment-analysis
+DB_DIR = REPO_ROOT / "data" / "raw"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "sims4.db"
 
@@ -30,6 +31,7 @@ def get_conn(db_path=DB_PATH):
 
 
 __all__ = [
+    "DB_PATH",
     "collect_reddit_posts",
     "collect_comments_for_posts",
     "init_db",
@@ -452,3 +454,26 @@ def collect_comments_for_candidates(
         total_inserted += len(df_c_norm)
 
     return total_inserted
+
+
+
+def get_db_counts(verbose: bool = True) -> tuple[int, int]:
+    """
+    Return counts of posts and comments from the active SQLite DB.
+    Uses the module's own get_conn/DB_PATH; no self-imports.
+    """
+    with get_conn() as conn:
+        posts = pd.read_sql_query("SELECT COUNT(*) AS n FROM posts;", conn)["n"].iloc[0]
+        comments = pd.read_sql_query("SELECT COUNT(*) AS n FROM comments;", conn)["n"].iloc[0]
+    if verbose:
+        print(f"DB file: {DB_PATH.resolve()}")
+        print(f"Posts: {int(posts):,} | Comments: {int(comments):,}")
+    return int(posts), int(comments)
+
+
+def print_delta(before_posts, before_comments, after_posts, after_comments, label=""):
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%SZ")
+    added_posts = after_posts - before_posts
+    added_comments = after_comments - before_comments
+    print(f"[{ts}] {label} → added posts: {added_posts:,} (total: {after_posts:,}) | "
+          f"added comments: {added_comments:,} (total: {after_comments:,})")
